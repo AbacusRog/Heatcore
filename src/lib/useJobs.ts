@@ -40,7 +40,7 @@ const fromRow = (r: { id: string; data: unknown }): Job => ({ ...(r.data as Job)
 
 function friendly(message: string): string {
   if (/row-level security|permission denied/i.test(message)) {
-    return 'This login is not set up as staff, so it cannot save jobs.';
+    return 'This login has not been given access to the app yet, so jobs cannot be saved. Ask Abacus to add it.';
   }
   return message;
 }

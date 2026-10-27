@@ -6,11 +6,23 @@ Stack: React + Vite + TypeScript + Tailwind CSS + Supabase. Installable to the h
 
 ## Where the data lives
 
-Jobs are saved to the `jmc_jobs` table in the **Abacus** Supabase project (public schema), one row per job with the full job in a `data` jsonb column. Sign-in is Supabase email and password, using the same staff check (`is_staff()`) as the other Abacus apps. Row level security means a login only ever sees its own jobs, and logins that are not staff see nothing.
+Jobs are saved to the `jmc_jobs` table in the **Clients** Supabase project (public schema), one row per job with the full job in a `data` jsonb column. This app is the only thing that uses `jmc_jobs` and `jmc_users`; no other app or table is touched.
+
+Sign-in is Supabase email and password. There is no sign-up screen. A login only sees its own jobs (row level security on `owner_id`), and only logins listed in `jmc_users` can save or read anything. A login that exists in Clients for another app gets nothing here until it is added.
 
 Edits are written to the phone first and saved to Supabase in the background. Offline, they wait and are sent when the phone reconnects. The badge at the top of each screen shows Saved, Saving or Offline.
 
-There is no sign-up screen. Use the login you already have in the Abacus project.
+## Giving a client a login
+
+1. Supabase, Clients project, Authentication, Users, Add user, Create new user. Enter their email and a password and tick Auto Confirm User.
+2. SQL Editor, run (with their email):
+
+```sql
+insert into public.jmc_users (user_id, note)
+select id, 'Client name' from auth.users where email = 'client@example.com';
+```
+
+To stop a login using the app, delete its row from `jmc_users`.
 
 ## Run it
 
@@ -28,7 +40,7 @@ Connect the GitHub repo, then set:
 
 - Build command: `npm run build`
 - Build output directory: `dist`
-- Environment variables: `NODE_VERSION` = `20`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (values are in `.env.example`)
+- Environment variables: `NODE_VERSION` = `20`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (values are in `.env.example`, pointing at the Clients project)
 
 In Supabase, add the deployed address under Authentication, URL Configuration, if you ever add email links or password resets.
 
@@ -41,6 +53,6 @@ All the maths lives in `src/lib/calc.ts`, with tests in `src/lib/calc.test.ts`.
 - Net cash = cash received (after CIS) + VAT reclaimed on purchases − VAT due on the invoice (zero under reverse charge) − everything paid out including VAT.
 - Net cash + CIS credit always equals profit.
 
-## Moving the table
+## Database setup
 
-The table, index and policy are one migration. To move the app to another Supabase project, run the same SQL there (it needs a function like `is_staff()`, or change the policy to `owner_id = auth.uid()` only), then change the two environment variables.
+Two tables, `jmc_users` (approved logins) and `jmc_jobs` (jobs), each with row level security on and no access for anonymous visitors. The policy on `jmc_jobs` allows a row only when `owner_id` is the signed-in user and that user is listed in `jmc_users`. The SQL is in `supabase/job_margin_checker.sql`.
