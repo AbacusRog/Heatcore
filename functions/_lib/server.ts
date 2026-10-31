@@ -27,6 +27,19 @@ export class HttpError extends Error {
   }
 }
 
+/** Intuit puts a transaction id on every reply. Quoting it lets Intuit support trace a call. */
+export const intuitTid = (res: Response): string => res.headers.get('intuit_tid') ?? '';
+
+/** Written to the Cloudflare logs. Never includes tokens or customer details. */
+function logFault(what: string, res: Response, detail = ''): void {
+  console.error(`[qbo] ${what} status=${res.status} intuit_tid=${intuitTid(res) || 'none'}${detail ? ` ${detail}` : ''}`);
+}
+
+const withRef = (message: string, res: Response): string => {
+  const tid = intuitTid(res);
+  return tid ? `${message} (Intuit reference ${tid})` : message;
+};
+
 export const json = (data: unknown, status = 200): Response =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
@@ -144,9 +157,10 @@ export async function tokenRequest(env: Env, form: Record<string, string>): Prom
     body: new URLSearchParams(form).toString(),
   });
   if (!res.ok) {
+    logFault('token request failed', res);
     throw new HttpError(
       res.status === 400 || res.status === 401 ? 409 : 502,
-      'QuickBooks did not accept the connection. Please try connecting again in Settings.',
+      withRef('QuickBooks did not accept the connection. Please try connecting again in Settings.', res),
     );
   }
   return (await res.json()) as TokenReply;
@@ -226,9 +240,12 @@ export async function qbo<T>(env: Env, conn: { realm: string; access: string }, 
     body = null;
   }
   if (!res.ok) {
-    if (res.status === 401) throw new HttpError(409, 'QuickBooks no longer accepts this connection. Please connect again in Settings.');
     const why = qboFault(body);
-    throw new HttpError(502, why ? `QuickBooks said: ${why}` : 'QuickBooks could not create the invoice. Please try again.');
+    logFault(`${init.method ?? 'GET'} ${path.split('?')[0]} failed`, res, why ? `reason="${why.slice(0, 300)}"` : '');
+    if (res.status === 401) {
+      throw new HttpError(409, withRef('QuickBooks no longer accepts this connection. Please connect again in Settings.', res));
+    }
+    throw new HttpError(502, withRef(why ? `QuickBooks said: ${why}` : 'QuickBooks could not create the invoice. Please try again.', res));
   }
   return body as T;
 }

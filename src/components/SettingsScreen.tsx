@@ -6,6 +6,8 @@ import type { Settings, VatMode } from '../lib/types';
 import { errorText } from '../lib/useData';
 import { Notice, Section, Seg, TextField } from './ui';
 
+const SUPPORT_EMAIL = 'roger@abacusconsultancy.co.uk';
+
 interface Props {
   settings: Settings;
   email: string;
@@ -146,6 +148,16 @@ export default function SettingsScreen({ settings, email, save, onSignOut, qboMe
         </Section>
 
         <QuickBooksCard message={qboMessage} />
+
+        <Section title="Need help?">
+          <p className="m-0 text-[0.9rem] text-muted">
+            If something is not working, email{' '}
+            <a className="font-semibold underline" href={`mailto:${SUPPORT_EMAIL}?subject=Job%20Margin%20Checker%20help`}>
+              {SUPPORT_EMAIL}
+            </a>
+            . If a QuickBooks message shows an “Intuit reference”, include it.
+          </p>
+        </Section>
 
         <Section title="Your login">
           <p className="m-0 text-[0.9rem] text-muted">Signed in as {email || 'your account'}.</p>

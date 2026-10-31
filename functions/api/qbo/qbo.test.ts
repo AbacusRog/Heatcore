@@ -40,7 +40,7 @@ describe('status', () => {
 });
 
 describe('send invoice to QuickBooks', () => {
-  async function run(over: { vat_mode?: string; taxCodes?: Array<{ Id: string; Name: string }>; exported?: string | null } = {}) {
+  async function run(over: { vat_mode?: string; taxCodes?: Array<{ Id: string; Name: string }>; exported?: string | null; invoiceFails?: boolean } = {}) {
     const calls: Array<{ method: string; url: string; body: unknown }> = [];
     const conn = {
       realm_id: '9341',
@@ -84,7 +84,15 @@ describe('send invoice to QuickBooks', () => {
         if (q.includes('from TaxCode')) return reply({ QueryResponse: { TaxCode: taxCodes } });
       }
       if (url.includes('/customer?')) return reply({ Customer: { Id: '58' } });
-      if (url.includes('/invoice?')) return reply({ Invoice: { Id: '201', DocNumber: '1001' } });
+      if (url.includes('/invoice?')) {
+        if (over.invoiceFails) {
+          return new Response(JSON.stringify({ Fault: { Error: [{ Message: 'Business Validation Error', Detail: 'Bad line' }] } }), {
+            status: 400,
+            headers: { intuit_tid: '1234-abcd' },
+          });
+        }
+        return reply({ Invoice: { Id: '201', DocNumber: '1001' } });
+      }
       return reply({}, 404);
     });
     const res = await invoice({
@@ -123,6 +131,17 @@ describe('send invoice to QuickBooks', () => {
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toMatch(/20% reverse charge.*20\.0% S/);
     expect(calls.some((c) => c.url.includes('/invoice?'))).toBe(false);
+  });
+
+  it('quotes the Intuit reference and logs the failure when QuickBooks rejects an invoice', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { res } = await run({ invoiceFails: true });
+    expect(res.status).toBe(502);
+    expect(((await res.json()) as { error: string }).error).toContain('Intuit reference 1234-abcd');
+    const line = String(log.mock.calls[0]?.[0]);
+    expect(line).toContain('intuit_tid=1234-abcd');
+    expect(line).not.toMatch(/Bearer|access|secret/i);
+    log.mockRestore();
   });
 
   it('will not send the same invoice twice', async () => {
