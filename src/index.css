@@ -23,6 +23,7 @@
   --c-extra: #b9812b;
   --c-lab: #7b6e9e;
   --c-profit: #17794a;
+  --nav-h: 58px;
   color-scheme: light;
 }
 
@@ -134,5 +135,34 @@ input::placeholder {
   * {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/* Quotes and invoices print on plain white paper whatever the phone's theme. */
+.paper {
+  color-scheme: light;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
   }
 }

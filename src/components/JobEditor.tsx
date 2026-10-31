@@ -17,6 +17,7 @@ interface Props {
   onBack: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onQuote: () => void;
 }
 
 const Chevron = ({ dir }: { dir: 'left' | 'right' }) => (
@@ -25,7 +26,7 @@ const Chevron = ({ dir }: { dir: 'left' | 'right' }) => (
   </svg>
 );
 
-export default function JobEditor({ job, status, onChange, onBack, onDuplicate, onDelete }: Props) {
+export default function JobEditor({ job, status, onChange, onBack, onDuplicate, onDelete, onQuote }: Props) {
   const [tab, setTab] = useState<Tab>('inputs');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [note, setNote] = useState('');
@@ -241,6 +242,9 @@ export default function JobEditor({ job, status, onChange, onBack, onDuplicate, 
                   className="w-full rounded-lg border border-lineStrong bg-surface2 p-3 font-mono text-[0.8rem] text-fg"
                 />
               )}
+              <button type="button" className="btn" onClick={onQuote}>
+                Create a quote from this job
+              </button>
               <button type="button" className="btn" onClick={onDuplicate}>
                 Duplicate job
               </button>

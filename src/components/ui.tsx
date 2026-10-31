@@ -144,3 +144,95 @@ export function Pill({ tone, children }: { tone: Tone; children: ReactNode }) {
     </span>
   );
 }
+
+export function TextField({
+  id,
+  label,
+  value,
+  onChange,
+  type = 'text',
+  placeholder,
+  inputMode,
+  autoComplete = 'off',
+  rows,
+  hint,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: 'text' | 'email' | 'tel' | 'date';
+  placeholder?: string;
+  inputMode?: 'text' | 'email' | 'tel' | 'numeric';
+  autoComplete?: string;
+  /** Set to make it a multi-line box. */
+  rows?: number;
+  hint?: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <label htmlFor={id} className="lbl">
+        {label}
+      </label>
+      {rows ? (
+        <textarea
+          id={id}
+          rows={rows}
+          className="input h-auto min-h-12 py-2.5 leading-snug"
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <input
+          id={id}
+          type={type}
+          className="input"
+          placeholder={placeholder}
+          inputMode={inputMode}
+          autoComplete={autoComplete}
+          autoCapitalize={type === 'email' ? 'none' : undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+      {hint && <p className="hint m-0">{hint}</p>}
+    </div>
+  );
+}
+
+/** The bar with the main button, sitting just above the bottom navigation. */
+export function ActionBar({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="no-print fixed inset-x-0 z-10 border-t border-line bg-bg"
+      style={{ bottom: 'calc(var(--nav-h) + env(safe-area-inset-bottom))' }}
+    >
+      <div className="mx-auto max-w-[560px] px-4 py-3">{children}</div>
+    </div>
+  );
+}
+
+export function Notice({ tone = 'info', children }: { tone?: 'info' | 'good' | 'bad' | 'warn'; children: ReactNode }) {
+  const look = {
+    info: 'bg-surface2 text-fg',
+    good: 'bg-posSoft text-pos',
+    bad: 'bg-negSoft text-neg',
+    warn: 'bg-warnSoft text-warn',
+  }[tone];
+  return (
+    <p role={tone === 'bad' ? 'alert' : 'status'} className={`m-0 rounded-lg px-3 py-2.5 text-[0.9rem] ${look}`}>
+      {children}
+    </p>
+  );
+}
+
+export async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
