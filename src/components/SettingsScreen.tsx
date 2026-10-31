@@ -157,6 +157,15 @@ export default function SettingsScreen({ settings, email, save, onSignOut, qboMe
             </a>
             . If a QuickBooks message shows an “Intuit reference”, include it.
           </p>
+          <p className="m-0 text-[0.9rem] text-muted">
+            <a className="underline" href="/privacy" target="_blank" rel="noreferrer">
+              Privacy policy
+            </a>
+            {' · '}
+            <a className="underline" href="/terms" target="_blank" rel="noreferrer">
+              Terms of use
+            </a>
+          </p>
         </Section>
 
         <Section title="Your login">
