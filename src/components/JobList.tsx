@@ -4,7 +4,7 @@ import { money, pct } from '../lib/format';
 import { downloadBackup, parseBackup } from '../lib/storage';
 import type { Job } from '../lib/types';
 import type { SyncStatus } from '../lib/useJobs';
-import { Pill, SyncBadge } from './ui';
+import { ActionBar, Pill, SyncBadge } from './ui';
 
 interface Props {
   jobs: Job[];
@@ -70,7 +70,7 @@ export default function JobList({
         className="mx-auto flex max-w-[560px] flex-col gap-5 px-4"
         style={{
           paddingTop: 'calc(20px + env(safe-area-inset-top))',
-          paddingBottom: 'calc(110px + env(safe-area-inset-bottom))',
+          paddingBottom: 'calc(var(--nav-h) + 110px + env(safe-area-inset-bottom))',
         }}
       >
         <header className="flex flex-col gap-1">
@@ -195,16 +195,11 @@ export default function JobList({
         )}
       </main>
 
-      <div
-        className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-bg"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
-        <div className="mx-auto max-w-[560px] px-4 py-3">
-          <button type="button" className="btn btn-primary w-full" onClick={onNew}>
-            + New job
-          </button>
-        </div>
-      </div>
+      <ActionBar>
+        <button type="button" className="btn btn-primary w-full" onClick={onNew}>
+          + New job
+        </button>
+      </ActionBar>
     </div>
   );
 }

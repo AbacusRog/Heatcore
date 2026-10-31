@@ -1,0 +1,6 @@
+# Only for running the Cloudflare functions locally with `wrangler pages dev`. Never commit real values.
+QBO_CLIENT_ID=
+QBO_CLIENT_SECRET=
+QBO_ENV=sandbox
+SUPABASE_URL=https://asassxbdpykwydqbmpji.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_17mPl6jLG2t3Oxggw70Wxw_1n4p2Y7T
