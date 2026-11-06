@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { supabase } from '../lib/supabase';
+import Turnstile from './Turnstile';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -8,12 +9,15 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!supabase) return;
     setBusy(true);
     setError('');
-    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password, options: { captchaToken: captchaToken ?? undefined } });
+    setCaptchaReset((n) => n + 1);
     if (err) setError(/invalid login/i.test(err.message) ? 'Email or password is not right.' : err.message);
     setBusy(false);
   }
@@ -68,7 +72,9 @@ export default function Login() {
               {error}
             </p>
           )}
-          <button type="submit" className="btn btn-primary" disabled={busy}>
+          <Turnstile onToken={setCaptchaToken} resetKey={captchaReset} />
+
+          <button type="submit" className="btn btn-primary" disabled={busy || !captchaToken}>
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
