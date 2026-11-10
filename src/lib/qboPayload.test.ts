@@ -54,6 +54,17 @@ describe('invoice payload', () => {
     expect(p.PrivateNote).toContain('INV-0001');
     expect(p).toMatchObject({ DueDate: '2026-11-14', BillEmail: { Address: 'sam@example.com' }, CustomerMemo: { value: 'Bathroom refit\nThanks' } });
   });
+  it('picks the tax code line by line: normal sales 20% VAT, CIS lines reverse charge', () => {
+    const p = buildInvoice({
+      ...base,
+      lines: [
+        newLine({ desc: 'Boiler', qty: '1', price: '500', kind: 'normal' }),
+        newLine({ desc: 'Labour', qty: '1', price: '2000', kind: 'cis_labour' }),
+        newLine({ desc: 'Materials', qty: '1', price: '3000', kind: 'cis_materials' }),
+      ],
+    }) as { Line: Array<{ SalesItemLineDetail: { TaxCodeRef: { value: string } } }> };
+    expect(p.Line.map((l) => l.SalesItemLineDetail.TaxCodeRef.value)).toEqual(['1', '6', '6']);
+  });
   it('uses the standard code for 20% VAT', () => {
     const p = buildInvoice({ ...base, vatMode: 'std' }) as { Line: Array<{ SalesItemLineDetail: { TaxCodeRef: { value: string } } }> };
     expect(p.Line[0].SalesItemLineDetail.TaxCodeRef.value).toBe('1');

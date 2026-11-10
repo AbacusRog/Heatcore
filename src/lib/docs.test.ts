@@ -5,6 +5,8 @@ import {
   copyLines,
   docLink,
   docTotals,
+  kindTotals,
+  lineVat,
   fmtDate,
   linesFromJob,
   mailtoUrl,
@@ -30,6 +32,40 @@ describe('document totals', () => {
   });
   it('treats blanks as nothing', () => {
     expect(docTotals([L('', ''), L('2', '')], 'std').gross).toBe(0);
+  });
+});
+
+describe('line types and VAT', () => {
+  const K = (kind: 'normal' | 'cis_labour' | 'cis_materials', price: string) => newLine({ kind, qty: '1', price });
+
+  it('puts CIS labour and CIS materials under the reverse charge when the document is reverse charge', () => {
+    const t = docTotals([K('cis_labour', '2216.28'), K('cis_materials', '5483.72')], 'rc');
+    expect(t).toEqual({ net: 7700, vat: 0, gross: 7700, rcVat: 1540 });
+  });
+  it('charges normal sales 20% VAT even on a reverse-charge document', () => {
+    const t = docTotals([K('normal', '1000'), K('cis_labour', '2000')], 'rc');
+    expect(t).toEqual({ net: 3000, vat: 200, gross: 3200, rcVat: 400 });
+  });
+  it('charges 20% VAT on CIS lines when the document is standard VAT', () => {
+    const t = docTotals([K('normal', '1000'), K('cis_materials', '500')], 'std');
+    expect(t).toEqual({ net: 1500, vat: 300, gross: 1800, rcVat: 0 });
+  });
+  it('charges no VAT on any line when the document says no VAT', () => {
+    expect(docTotals([K('normal', '100'), K('cis_labour', '100')], 'none')).toEqual({ net: 200, vat: 0, gross: 200, rcVat: 0 });
+  });
+  it('treats a line saved before types existed as following the document setting', () => {
+    expect(docTotals([L('1', '100')], 'rc')).toEqual({ net: 100, vat: 0, gross: 100, rcVat: 20 });
+    expect(lineVat(L('1', '100'), 'rc')).toBe('rc');
+    expect(lineVat(K('normal', '100'), 'rc')).toBe('std');
+  });
+  it('totals each kind for the breakdown', () => {
+    expect(kindTotals([K('normal', '10'), K('cis_labour', '20'), K('cis_labour', '5'), L('1', '99')])).toEqual({ normal: 10, cis_labour: 25, cis_materials: 0 });
+  });
+  it('marks job lines as CIS when the job is CIS or reverse charge, otherwise normal', () => {
+    const cisJob = linesFromJob({ ...exampleJob(), vatMode: 'rc' });
+    expect(cisJob.map((l) => l.kind)).toEqual(['cis_materials', 'cis_labour']);
+    const plain = linesFromJob({ ...exampleJob(), vatMode: 'std', cis: '0' });
+    expect(plain.map((l) => l.kind)).toEqual(['normal', 'normal']);
   });
 });
 

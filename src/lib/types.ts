@@ -37,11 +37,15 @@ export interface Job {
 
 export type VatMode = 'std' | 'rc' | 'none';
 
+/** What a line is for: a normal sale, CIS labour (CIS sales) or CIS materials. Lines saved before this existed have none. */
+export type LineKind = 'normal' | 'cis_labour' | 'cis_materials';
+
 export interface DocLine {
   id: string;
   desc: string;
   qty: string;
   price: string;
+  kind?: LineKind;
 }
 
 export interface Settings {

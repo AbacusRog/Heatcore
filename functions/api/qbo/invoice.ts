@@ -1,3 +1,4 @@
+import { lineUsed, lineVat } from '../../../src/lib/docs';
 import { buildInvoice, pickTaxCodes, qboQuote } from '../../../src/lib/qboPayload';
 import type { QboTaxCode, TaxIds } from '../../../src/lib/qboPayload';
 import type { DocLine, VatMode } from '../../../src/lib/types';
@@ -51,16 +52,18 @@ async function serviceItem(env: Env, conn: Conn): Promise<string> {
   return pick.Id;
 }
 
-async function taxIds(env: Env, conn: Conn, mode: VatMode): Promise<TaxIds> {
+async function taxIds(env: Env, conn: Conn, lines: DocLine[], mode: VatMode): Promise<TaxIds> {
   const codes = await qboQuery<QboTaxCode>(env, conn, 'select Id, Name, Active from TaxCode maxresults 200');
   const { ids, missing } = pickTaxCodes(codes, {
     ...(env.QBO_TAXCODE_STD ? { std: env.QBO_TAXCODE_STD } : {}),
     ...(env.QBO_TAXCODE_RC ? { rc: env.QBO_TAXCODE_RC } : {}),
     ...(env.QBO_TAXCODE_NONE ? { none: env.QBO_TAXCODE_NONE } : {}),
   });
-  const need = mode === 'std' ? 'std' : mode === 'rc' ? 'rc' : 'none';
-  if (missing.includes(need)) {
-    const label = mode === 'std' ? '20% VAT' : mode === 'rc' ? '20% reverse charge' : 'No VAT';
+  // Only the codes this invoice's lines actually use have to exist.
+  const used = new Set(lines.filter(lineUsed).map((l) => lineVat(l, mode)));
+  const need = (['std', 'rc', 'none'] as const).find((k) => used.has(k) && missing.includes(k));
+  if (need) {
+    const label = need === 'std' ? '20% VAT' : need === 'rc' ? '20% reverse charge' : 'No VAT';
     const names = codes.map((c) => c.Name).slice(0, 12).join(', ');
     throw new HttpError(409, `We could not find the QuickBooks tax code for ${label}. Tax codes in your QuickBooks: ${names || 'none found'}. Abacus can set the right one on the site.`);
   }
@@ -82,7 +85,7 @@ export const onRequestPost = ({ request, env }: Ctx): Promise<Response> =>
     if (!inv.customer_name.trim()) throw new HttpError(400, 'Add the customer’s name first.');
 
     const conn = await liveConnection(env, who);
-    const [cust, item, tax] = await Promise.all([customerId(env, conn, inv), serviceItem(env, conn), taxIds(env, conn, inv.vat_mode)]);
+    const [cust, item, tax] = await Promise.all([customerId(env, conn, inv), serviceItem(env, conn), taxIds(env, conn, inv.lines, inv.vat_mode)]);
 
     const body = buildInvoice({
       customerId: cust,

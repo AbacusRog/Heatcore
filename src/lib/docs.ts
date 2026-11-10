@@ -1,7 +1,7 @@
 import { num, r2 } from './calc';
 import { newId } from './defaults';
 import { money } from './format';
-import type { Business, DocData, DocLine, Invoice, Job, Quote, Settings, VatMode } from './types';
+import type { Business, DocData, DocLine, Invoice, Job, LineKind, Quote, Settings, VatMode } from './types';
 import { compute } from './calc';
 
 export const VAT_RATE = 0.2;
@@ -40,11 +40,47 @@ export interface Totals {
   rcVat: number;
 }
 
+export const kindLabel: Record<LineKind, string> = {
+  normal: 'Normal sale',
+  cis_labour: 'CIS sales (labour)',
+  cis_materials: 'CIS materials',
+};
+
+/** The short name printed under a CIS line on the document. */
+export const kindTag = (l: DocLine): string => (l.kind === 'cis_labour' ? 'CIS labour' : l.kind === 'cis_materials' ? 'CIS materials' : '');
+
+/**
+ * How VAT applies to one line. Normal sales always carry 20% VAT. CIS sales and CIS materials follow the
+ * document's setting (20% VAT or 20% reverse charge). "No VAT" on the document means no VAT on any line.
+ * A line saved before types existed also follows the document's setting.
+ */
+export function lineVat(l: DocLine, vatMode: VatMode): VatMode {
+  if (vatMode === 'none') return 'none';
+  return l.kind === 'normal' ? 'std' : vatMode;
+}
+
 export function docTotals(lines: DocLine[], vatMode: VatMode): Totals {
-  const net = r2(lines.reduce((s, l) => s + lineTotal(l), 0));
-  const vat = vatMode === 'std' ? r2(net * VAT_RATE) : 0;
-  const rcVat = vatMode === 'rc' ? r2(net * VAT_RATE) : 0;
+  let net = 0;
+  let stdNet = 0;
+  let rcNet = 0;
+  for (const l of lines) {
+    const v = lineTotal(l);
+    net += v;
+    const m = lineVat(l, vatMode);
+    if (m === 'std') stdNet += v;
+    else if (m === 'rc') rcNet += v;
+  }
+  const vat = r2(stdNet * VAT_RATE);
+  const rcVat = r2(rcNet * VAT_RATE);
+  net = r2(net);
   return { net, vat, gross: r2(net + vat), rcVat };
+}
+
+/** Net amount of each kind of line, for the breakdown on the document. Untyped lines are left out. */
+export function kindTotals(lines: DocLine[]): Record<LineKind, number> {
+  const out: Record<LineKind, number> = { normal: 0, cis_labour: 0, cis_materials: 0 };
+  for (const l of lines) if (l.kind) out[l.kind] = r2(out[l.kind] + lineTotal(l));
+  return out;
 }
 
 export const vatLabel: Record<VatMode, string> = {
@@ -83,15 +119,19 @@ export function fmtDate(iso: string | null | undefined): string {
 export function linesFromJob(job: Job): DocLine[] {
   const c = compute(job);
   const lines: DocLine[] = [];
-  if (c.matCharge > 0) lines.push(newLine({ desc: 'Materials', qty: '1', price: String(c.matCharge) }));
+  // A CIS or reverse-charge job is CIS work; anything else is a normal sale.
+  const cis = job.vatMode === 'rc' || job.cis !== '0';
+  const matKind: LineKind = cis ? 'cis_materials' : 'normal';
+  const labKind: LineKind = cis ? 'cis_labour' : 'normal';
+  if (c.matCharge > 0) lines.push(newLine({ desc: 'Materials', qty: '1', price: String(c.matCharge), kind: matKind }));
   if (c.labourCharge > 0) {
     lines.push(
       c.byHours
-        ? newLine({ desc: 'Labour', qty: String(c.hours), price: String(c.rate) })
-        : newLine({ desc: 'Labour', qty: '1', price: String(c.labourCharge) }),
+        ? newLine({ desc: 'Labour', qty: String(c.hours), price: String(c.rate), kind: labKind })
+        : newLine({ desc: 'Labour', qty: '1', price: String(c.labourCharge), kind: labKind }),
     );
   }
-  return lines.length ? lines : [newLine()];
+  return lines.length ? lines : [newLine({ kind: 'normal' })];
 }
 
 /** Invoice lines copied from an accepted quote, with fresh line ids. */

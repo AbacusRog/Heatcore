@@ -1,12 +1,16 @@
-import { RC_NOTE, docTotals, fmtDate, lineTotal, lineUsed } from '../lib/docs';
+import { RC_NOTE, docTotals, fmtDate, kindLabel, kindTag, kindTotals, lineTotal, lineUsed } from '../lib/docs';
 import { money } from '../lib/format';
 import { plainNumber, num } from '../lib/calc';
-import type { DocData } from '../lib/types';
+import type { DocData, LineKind } from '../lib/types';
 
 /** The quote or invoice as the customer sees it. Always on white paper so it prints and saves cleanly. */
 export default function DocView({ doc }: { doc: DocData }) {
   const t = docTotals(doc.lines, doc.vat_mode);
   const shown = doc.lines.filter((l) => l.desc.trim() || lineUsed(l));
+  const byKind = kindTotals(doc.lines.filter(lineUsed));
+  const kindsPresent = (Object.keys(byKind) as LineKind[]).filter((k) => byKind[k] > 0);
+  const showStd = doc.vat_mode === 'std' || t.vat > 0;
+  const showRc = doc.vat_mode === 'rc' || t.rcVat > 0;
   const b = doc.business;
   const isQuote = doc.kind === 'quote';
 
@@ -50,6 +54,7 @@ export default function DocView({ doc }: { doc: DocData }) {
             <li key={l.id} className="flex items-start justify-between gap-4 border-b border-neutral-200 py-3">
               <div className="min-w-0">
                 <div className="whitespace-pre-line break-words font-medium">{l.desc.trim() || 'Item'}</div>
+                {kindTag(l) && <div className="text-[0.75rem] font-semibold uppercase tracking-[0.06em] text-neutral-500">{kindTag(l)}</div>}
                 {num(l.qty) !== 1 && (
                   <div className="font-mono text-[0.8rem] text-neutral-600">
                     {plainNumber(num(l.qty))} × {money(num(l.price))}
@@ -62,17 +67,24 @@ export default function DocView({ doc }: { doc: DocData }) {
         </ul>
 
         <dl className="m-0 mt-3 ml-auto flex max-w-[300px] flex-col gap-1.5 text-[0.92rem]">
+          {kindsPresent.length > 1 &&
+            kindsPresent.map((k) => (
+              <div key={k} className="flex justify-between gap-4 text-[0.85rem] text-neutral-600">
+                <dt>{kindLabel[k]}</dt>
+                <dd className="m-0 font-mono tabular-nums">{money(byKind[k])}</dd>
+              </div>
+            ))}
           <div className="flex justify-between gap-4">
             <dt className="text-neutral-700">Subtotal</dt>
             <dd className="m-0 font-mono tabular-nums">{money(t.net)}</dd>
           </div>
-          {doc.vat_mode === 'std' && (
+          {showStd && (
             <div className="flex justify-between gap-4">
               <dt className="text-neutral-700">VAT at 20%</dt>
               <dd className="m-0 font-mono tabular-nums">{money(t.vat)}</dd>
             </div>
           )}
-          {doc.vat_mode === 'rc' && (
+          {showRc && (
             <div className="flex justify-between gap-4">
               <dt className="text-neutral-700">VAT at 20% (reverse charge)</dt>
               <dd className="m-0 font-mono tabular-nums">{money(0)}</dd>
@@ -90,7 +102,7 @@ export default function DocView({ doc }: { doc: DocData }) {
           </div>
         </dl>
 
-        {doc.vat_mode === 'rc' && (
+        {t.rcVat > 0 && (
           <p className="m-0 mt-3 rounded-lg bg-neutral-100 px-3 py-2.5 text-[0.85rem] leading-snug text-neutral-800">
             {RC_NOTE} VAT of {money(t.rcVat)} at 20% is due from you, not from {b.name || 'us'}.
           </p>

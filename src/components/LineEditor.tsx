@@ -1,15 +1,33 @@
-import { lineTotal, newLine } from '../lib/docs';
+import { kindLabel, lineTotal, lineVat, newLine, vatLabel } from '../lib/docs';
 import { money } from '../lib/format';
-import type { DocLine } from '../lib/types';
+import type { DocLine, LineKind, VatMode } from '../lib/types';
 import { cleanNumber } from './ui';
 
-export default function LineEditor({ lines, onChange }: { lines: DocLine[]; onChange: (l: DocLine[]) => void }) {
+export default function LineEditor({ lines, vatMode, onChange }: { lines: DocLine[]; vatMode: VatMode; onChange: (l: DocLine[]) => void }) {
   const patch = (id: string, p: Partial<DocLine>) => onChange(lines.map((l) => (l.id === id ? { ...l, ...p } : l)));
 
   return (
     <div className="flex flex-col gap-3">
       {lines.map((l, i) => (
         <div key={l.id} className="flex flex-col gap-2 rounded-lg border border-line bg-surface2 p-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`l-${l.id}-kind`} className="lbl">
+              Type
+            </label>
+            <select
+              id={`l-${l.id}-kind`}
+              className="input bg-surface"
+              value={l.kind ?? ''}
+              onChange={(e) => patch(l.id, { kind: (e.target.value || undefined) as LineKind | undefined })}
+            >
+              {!l.kind && <option value="">Choose a type…</option>}
+              {(Object.keys(kindLabel) as LineKind[]).map((k) => (
+                <option key={k} value={k}>
+                  {kindLabel[k]}
+                </option>
+              ))}
+            </select>
+          </div>
           <textarea
             id={`l-${l.id}-desc`}
             rows={2}
@@ -50,16 +68,19 @@ export default function LineEditor({ lines, onChange }: { lines: DocLine[]; onCh
             <button
               type="button"
               className="h-10 px-1 text-[0.9rem] font-semibold text-neg"
-              onClick={() => onChange(lines.length > 1 ? lines.filter((x) => x.id !== l.id) : [newLine()])}
+              onClick={() => onChange(lines.length > 1 ? lines.filter((x) => x.id !== l.id) : [newLine({ kind: 'normal' })])}
               aria-label={`Remove line ${i + 1}`}
             >
               Remove
             </button>
-            <span className="font-mono text-[0.95rem] font-semibold tabular-nums">{money(lineTotal(l))}</span>
+            <span className="flex flex-col items-end">
+              <span className="font-mono text-[0.95rem] font-semibold tabular-nums">{money(lineTotal(l))}</span>
+              <span className="text-[0.75rem] text-muted">{vatLabel[lineVat(l, vatMode)]}</span>
+            </span>
           </div>
         </div>
       ))}
-      <button type="button" className="btn" onClick={() => onChange([...lines, newLine()])}>
+      <button type="button" className="btn" onClick={() => onChange([...lines, newLine({ kind: 'normal' })])}>
         + Add a line
       </button>
     </div>

@@ -1,5 +1,5 @@
 import { num } from './calc';
-import { lineTotal, lineUsed } from './docs';
+import { lineTotal, lineUsed, lineVat } from './docs';
 import type { DocLine, VatMode } from './types';
 
 export interface QboTaxCode {
@@ -56,7 +56,6 @@ export interface InvoiceInput {
 
 /** The QuickBooks invoice. We do not send our own number: QuickBooks numbers it unless the company allows custom numbers. */
 export function buildInvoice(i: InvoiceInput): Record<string, unknown> {
-  const taxId = i.vatMode === 'std' ? i.taxIds.std : i.vatMode === 'rc' ? i.taxIds.rc : i.taxIds.none;
   const memo = [i.title.trim(), i.notes.trim()].filter(Boolean).join('\n').slice(0, 1000);
   const body: Record<string, unknown> = {
     CustomerRef: { value: i.customerId },
@@ -72,7 +71,7 @@ export function buildInvoice(i: InvoiceInput): Record<string, unknown> {
         ItemRef: { value: i.itemId },
         Qty: num(l.qty),
         UnitPrice: num(l.price),
-        TaxCodeRef: { value: taxId },
+        TaxCodeRef: { value: i.taxIds[lineVat(l, i.vatMode)] },
       },
     })),
   };

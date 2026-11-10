@@ -205,7 +205,7 @@ export default function DocShell({ kind, doc, settings, pill, onSave, onBack, on
                 <TextField id="cend" label={kind === 'quote' ? 'Valid until' : 'Due date'} type="date" value={form.end_date} onChange={(v) => change({ end_date: v })} />
               </div>
               <Seg
-                legend="VAT"
+                legend="VAT on CIS sales and CIS materials"
                 name="docVat"
                 value={form.vat_mode}
                 onChange={(v) => change({ vat_mode: v })}
@@ -215,10 +215,11 @@ export default function DocShell({ kind, doc, settings, pill, onSave, onBack, on
                   { value: 'none', label: 'No VAT' },
                 ]}
               />
+              <p className="hint m-0">Normal sales always carry 20% VAT. This choice applies to lines marked CIS sales or CIS materials. “No VAT” removes VAT from every line.</p>
             </Section>
 
             <Section title="Items" note="Prices are each, before VAT. The customer sees these lines and the totals, never your costs.">
-              <LineEditor lines={form.lines} onChange={(lines) => change({ lines })} />
+              <LineEditor lines={form.lines} vatMode={form.vat_mode} onChange={(lines) => change({ lines })} />
             </Section>
 
             <Section title="Notes" note="Optional. Shown on the document, e.g. access arrangements or what is not included.">
@@ -254,7 +255,7 @@ export default function DocShell({ kind, doc, settings, pill, onSave, onBack, on
         >
           <span className="mx-auto flex max-w-[560px] items-center justify-between gap-3 px-4 py-3">
             <span className="block">
-              <span className="block text-[0.68rem] font-semibold uppercase tracking-[0.07em] text-muted">Total{current.vat_mode === 'std' ? ' inc VAT' : ''}</span>
+              <span className="block text-[0.68rem] font-semibold uppercase tracking-[0.07em] text-muted">Total{totals.vat > 0 ? ' inc VAT' : ''}</span>
               <span className="block font-mono text-[1.15rem] font-semibold tabular-nums">{money(totals.gross)}</span>
             </span>
             <span className="btn btn-primary">Preview and send</span>
