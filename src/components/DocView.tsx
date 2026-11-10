@@ -1,11 +1,11 @@
-import { RC_NOTE, docTotals, fmtDate, kindLabel, kindTag, kindTotals, lineTotal, lineUsed } from '../lib/docs';
+import { RC_NOTE, totalsOf, fmtDate, kindLabel, kindTag, kindTotals, lineTotal, lineUsed } from '../lib/docs';
 import { money } from '../lib/format';
 import { plainNumber, num } from '../lib/calc';
 import type { DocData, LineKind } from '../lib/types';
 
 /** The quote or invoice as the customer sees it. Always on white paper so it prints and saves cleanly. */
 export default function DocView({ doc }: { doc: DocData }) {
-  const t = docTotals(doc.lines, doc.vat_mode);
+  const t = totalsOf(doc);
   const shown = doc.lines.filter((l) => l.desc.trim() || lineUsed(l));
   const byKind = kindTotals(doc.lines.filter(lineUsed));
   const kindsPresent = (Object.keys(byKind) as LineKind[]).filter((k) => byKind[k] > 0);

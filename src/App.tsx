@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import BottomNav from './components/BottomNav';
 import type { Tab } from './components/BottomNav';
+import { CustomerList, CustomerScreen } from './components/Customers';
 import DocList from './components/DocList';
 import type { DocRow } from './components/DocList';
 import InvoiceScreen, { invoicePill } from './components/InvoiceScreen';
@@ -13,19 +15,19 @@ import QuoteScreen, { quotePill } from './components/QuoteScreen';
 import SettingsScreen from './components/SettingsScreen';
 import { Notice } from './components/ui';
 import { blankJob, exampleJob, newId } from './lib/defaults';
-import { addDays, copyLines, docTotals, linesFromJob, newLine, todayIso } from './lib/docs';
+import { addDays, copyLines, grossOf, linesFromJob, newLine, todayIso } from './lib/docs';
 import { checkOauthState, qboExchange } from './lib/qbo';
 import { supabase } from './lib/supabase';
-import type { Invoice, Job, Quote } from './lib/types';
-import { errorText, useInvoices, useQuotes, useSettings } from './lib/useData';
+import type { Customer, Invoice, Job, Quote } from './lib/types';
+import { errorText, useCustomers, useInvoices, useQuotes, useSettings } from './lib/useData';
 import { useJobs } from './lib/useJobs';
 
 type Route =
   | { name: 'tab'; tab: Tab }
-  | { name: 'job' | 'quote' | 'invoice'; id: string }
+  | { name: 'job' | 'quote' | 'invoice' | 'customer'; id: string }
   | { name: 'public'; kind: 'quote' | 'invoice'; token: string };
 
-const TAB_HASH: Record<Tab, string> = { jobs: '', quotes: '#/quotes', invoices: '#/invoices', settings: '#/settings' };
+const TAB_HASH: Record<Tab, string> = { jobs: '', quotes: '#/quotes', invoices: '#/invoices', customers: '#/customers', settings: '#/settings' };
 
 function parseHash(): Route {
   const h = window.location.hash;
@@ -33,17 +35,18 @@ function parseHash(): Route {
   if (m) return { name: 'public', kind: 'quote', token: m[1] };
   m = h.match(/^#\/i\/([A-Za-z0-9_-]{16,})$/);
   if (m) return { name: 'public', kind: 'invoice', token: m[1] };
-  m = h.match(/^#\/(job|quote|invoice)\/(.+)$/);
-  if (m) return { name: m[1] as 'job' | 'quote' | 'invoice', id: decodeURIComponent(m[2]) };
+  m = h.match(/^#\/(job|quote|invoice|customer)\/(.+)$/);
+  if (m) return { name: m[1] as 'job' | 'quote' | 'invoice' | 'customer', id: decodeURIComponent(m[2]) };
   if (h === '#/quotes') return { name: 'tab', tab: 'quotes' };
   if (h === '#/invoices') return { name: 'tab', tab: 'invoices' };
+  if (h === '#/customers') return { name: 'tab', tab: 'customers' };
   if (h === '#/settings') return { name: 'tab', tab: 'settings' };
   return { name: 'tab', tab: 'jobs' };
 }
 
 export interface Nav {
   tab: (t: Tab) => void;
-  open: (kind: 'job' | 'quote' | 'invoice', id: string, replace?: boolean) => void;
+  open: (kind: 'job' | 'quote' | 'invoice' | 'customer', id: string, replace?: boolean) => void;
   back: (fallback: Tab) => void;
 }
 
@@ -112,6 +115,7 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
   const { settings } = settingsData;
   const quotes = useQuotes();
   const invoices = useInvoices();
+  const customers = useCustomers();
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
   const [qboMessage, setQboMessage] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
@@ -160,6 +164,19 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
     }
     throw last;
   }
+
+  /** Remember a customer the first time we send them something. Never overwrites one already saved. */
+  async function rememberCustomer(d: { customer_name: string; customer_email: string; customer_address: string }) {
+    const name = d.customer_name.trim();
+    if (!name || !supabase) return;
+    if (customers.rows.some((c) => c.name.trim().toLowerCase() === name.toLowerCase())) return;
+    const { error } = await supabase
+      .from('jmc_customers')
+      .upsert({ name, email: d.customer_email.trim(), address: d.customer_address.trim(), source: 'app' }, { onConflict: 'owner_id,name_key', ignoreDuplicates: true });
+    if (!error) void customers.refresh();
+  }
+
+  const customerSeed = (c: Customer) => ({ customer_name: c.name, customer_email: c.email, customer_address: c.address });
 
   async function newQuote(seed: Partial<Quote> = {}) {
     setCreating(true);
@@ -221,13 +238,21 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
 
   const goTab = (t: Tab) => nav.tab(t);
   const waiting = quotes.rows.filter((q) => q.status === 'accepted').length;
+  /** The tab bar stays on screen everywhere, editors included. */
+  const withNav = (active: Tab, screen: ReactNode) => (
+    <>
+      {screen}
+      <BottomNav active={active} onGo={goTab} waiting={waiting} />
+    </>
+  );
 
-  /* ---------- Editors (full screen, no tab bar) ---------- */
+  /* ---------- Editors ---------- */
 
   if (route.name === 'job') {
     const job = jobs.find((j) => j.id === route.id);
     if (job) {
-      return (
+      return withNav(
+        'jobs',
         <JobEditor
           key={job.id}
           job={job}
@@ -252,7 +277,7 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
             removeJob(job.id);
             nav.tab('jobs');
           }}
-        />
+        />,
       );
     }
   }
@@ -261,12 +286,18 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
     const quote = quotes.rows.find((q) => q.id === route.id);
     if (quote) {
       const inv = invoices.rows.find((i) => i.id === quote.invoice_id);
-      return (
+      return withNav(
+        'quotes',
         <QuoteScreen
           quote={quote}
           settings={settings}
+          customers={customers.rows}
           invoiceNumber={inv?.number}
-          onUpdate={(patch) => quotes.update(quote.id, patch)}
+          onUpdate={async (patch) => {
+            const saved = await quotes.update(quote.id, patch);
+            if (patch.status === 'sent') void rememberCustomer(saved);
+            return saved;
+          }}
           onBack={() => nav.back('quotes')}
           onDelete={async () => {
             await quotes.remove(quote.id);
@@ -275,7 +306,7 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
           onCreateInvoice={() => invoiceFromQuote(quote)}
           onOpenInvoice={() => inv && nav.open('invoice', inv.id)}
           onSettings={() => nav.tab('settings')}
-        />
+        />,
       );
     }
     if (!quotes.loaded) return <div className="min-h-dvh" aria-busy="true" />;
@@ -284,26 +315,63 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
   if (route.name === 'invoice') {
     const invoice = invoices.rows.find((i) => i.id === route.id);
     if (invoice) {
-      return (
+      return withNav(
+        'invoices',
         <InvoiceScreen
           invoice={invoice}
           settings={settings}
-          onUpdate={(patch) => invoices.update(invoice.id, patch)}
+          customers={customers.rows}
+          onUpdate={async (patch) => {
+            const saved = await invoices.update(invoice.id, patch);
+            if (patch.status === 'sent') void rememberCustomer(saved);
+            return saved;
+          }}
           onBack={() => nav.back('invoices')}
           onDelete={async () => {
             await invoices.remove(invoice.id);
             nav.tab('invoices');
           }}
           onSettings={() => nav.tab('settings')}
-        />
+        />,
       );
     }
     if (!invoices.loaded) return <div className="min-h-dvh" aria-busy="true" />;
   }
 
+  if (route.name === 'customer') {
+    const isNew = route.id === 'new';
+    const customer = isNew ? null : customers.rows.find((c) => c.id === route.id);
+    if (isNew || customer) {
+      return withNav(
+        'customers',
+        <CustomerScreen
+          customer={customer ?? null}
+          quotes={quotes.rows}
+          invoices={invoices.rows}
+          onSave={async (v) => {
+            if (customer) return customers.update(customer.id, v);
+            const saved = await customers.insert({ ...v, source: 'app' });
+            nav.open('customer', saved.id, true);
+            return saved;
+          }}
+          onDelete={async () => {
+            if (customer) await customers.remove(customer.id);
+            nav.tab('customers');
+          }}
+          onBack={() => nav.back('customers')}
+          onQuote={(c) => void newQuote(customerSeed(c))}
+          onInvoice={(c) => void newInvoice(customerSeed(c))}
+          onOpenQuote={(id) => nav.open('quote', id)}
+          onOpenInvoice={(id) => nav.open('invoice', id)}
+        />,
+      );
+    }
+    if (!customers.loaded) return <div className="min-h-dvh" aria-busy="true" />;
+  }
+
   /* ---------- Tabs ---------- */
 
-  const tab: Tab = route.name === 'tab' ? route.tab : route.name === 'quote' ? 'quotes' : route.name === 'invoice' ? 'invoices' : 'jobs';
+  const tab: Tab = route.name === 'tab' ? route.tab : route.name === 'quote' ? 'quotes' : route.name === 'invoice' ? 'invoices' : route.name === 'customer' ? 'customers' : 'jobs';
 
   let page;
   if (tab === 'quotes') {
@@ -312,7 +380,7 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
       number: q.number,
       customer: q.customer_name,
       title: q.title,
-      total: docTotals(q.lines, q.vat_mode).gross,
+      total: grossOf(q),
       date: q.issue_date,
       pill: quotePill[q.status],
     }));
@@ -332,12 +400,14 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
       />
     );
   } else if (tab === 'invoices') {
-    const rows: DocRow[] = invoices.rows.map((i: Invoice) => ({
+    const rows: DocRow[] = [...invoices.rows]
+      .sort((a, b) => (a.issue_date < b.issue_date ? 1 : a.issue_date > b.issue_date ? -1 : 0))
+      .map((i: Invoice) => ({
       id: i.id,
       number: i.number,
       customer: i.customer_name,
       title: i.title,
-      total: docTotals(i.lines, i.vat_mode).gross,
+      total: grossOf(i),
       date: i.issue_date,
       pill: invoicePill(i),
     }));
@@ -356,6 +426,10 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
         onOpen={(id) => nav.open('invoice', id)}
       />
     );
+  } else if (tab === 'customers') {
+    page = (
+      <CustomerList customers={customers.rows} loaded={customers.loaded} error={customers.error} onOpen={(id) => nav.open('customer', id)} onNew={() => nav.open('customer', 'new')} />
+    );
   } else if (tab === 'settings') {
     page = settingsData.loaded ? (
       <SettingsScreen
@@ -365,6 +439,10 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
         save={settingsData.save}
         onSignOut={() => void supabase?.auth.signOut()}
         qboMessage={qboMessage}
+        onImported={() => {
+          void customers.refresh();
+          void invoices.refresh();
+        }}
       />
     ) : (
       <div className="min-h-dvh" aria-busy="true">
@@ -399,7 +477,7 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
     );
   }
 
-  async function newInvoice() {
+  async function newInvoice(seed: Partial<Invoice> = {}) {
     setCreating(true);
     try {
       const inv = await withNumber('invoice', (number) =>
@@ -415,6 +493,7 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
           notes: '',
           issue_date: todayIso(),
           due_date: addDays(todayIso(), settings.payment_days),
+          ...seed,
         }),
       );
       nav.open('invoice', inv.id);
@@ -424,11 +503,6 @@ function Signed({ userId, email, route, nav }: { userId: string; email: string; 
     setCreating(false);
   }
 
-  return (
-    <>
-      {page}
-      <BottomNav active={tab} onGo={goTab} waiting={waiting} />
-    </>
-  );
+  return withNav(tab, page);
 }
 

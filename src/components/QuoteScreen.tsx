@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import type { Tone } from '../lib/calc';
-import { docLink, fmtDate, mailText, mailtoUrl, quoteMail, readyToSend } from '../lib/docs';
+import { docLink, fmtDate, mailText, mailtoUrl, quoteDoc, quoteMail, readyToSend } from '../lib/docs';
 import type { Mail } from '../lib/docs';
-import type { Quote, QuoteStatus, Settings } from '../lib/types';
+import type { Customer, Quote, QuoteStatus, Settings } from '../lib/types';
 import { errorText } from '../lib/useData';
 import DocShell from './DocShell';
+import PdfButton from './PdfButton';
 import { Notice, copyText } from './ui';
 
 export const quotePill: Record<QuoteStatus, { tone: Tone; label: string }> = {
@@ -18,6 +19,7 @@ export const quotePill: Record<QuoteStatus, { tone: Tone; label: string }> = {
 interface Props {
   quote: Quote;
   settings: Settings;
+  customers: Customer[];
   invoiceNumber?: string;
   onUpdate: (patch: Partial<Quote>) => Promise<Quote>;
   onBack: () => void;
@@ -27,7 +29,7 @@ interface Props {
   onSettings: () => void;
 }
 
-export default function QuoteScreen({ quote, settings, invoiceNumber, onUpdate, onBack, onDelete, onCreateInvoice, onOpenInvoice, onSettings }: Props) {
+export default function QuoteScreen({ quote, settings, customers, invoiceNumber, onUpdate, onBack, onDelete, onCreateInvoice, onOpenInvoice, onSettings }: Props) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'good' | 'bad' | 'info'; text: string } | null>(null);
   const [mail, setMail] = useState<Mail | null>(null);
@@ -117,6 +119,7 @@ export default function QuoteScreen({ quote, settings, invoiceNumber, onUpdate, 
       kind="quote"
       doc={quote}
       settings={settings}
+      customers={customers}
       pill={quotePill[quote.status]}
       onSave={(patch) => onUpdate(patch as Partial<Quote>)}
       onBack={onBack}
@@ -153,6 +156,8 @@ export default function QuoteScreen({ quote, settings, invoiceNumber, onUpdate, 
               </button>
             </div>
           )}
+
+          <PdfButton doc={quoteDoc(current as Quote, settings)} />
 
           {quote.status !== 'draft' && (
             <button type="button" className="btn" onClick={() => void copy(link, 'Link copied.')}>
@@ -193,7 +198,7 @@ export default function QuoteScreen({ quote, settings, invoiceNumber, onUpdate, 
 
           {quote.status !== 'draft' && (
             <button type="button" className="btn" onClick={() => window.print()}>
-              Print or save as PDF
+              Print
             </button>
           )}
 

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { fmtDate } from '../lib/docs';
-import type { DocData, DocLine, VatMode } from '../lib/types';
+import type { DocData, DocLine, ImportedTotals, VatMode } from '../lib/types';
 import { supabase } from '../lib/supabase';
 import { errorText, fetchPublicDoc, respondToQuote } from '../lib/useData';
 import DocView from './DocView';
+import PdfButton from './PdfButton';
 import { Notice, TextField } from './ui';
 
 interface Loaded {
@@ -27,6 +28,7 @@ function toDoc(kind: 'quote' | 'invoice', r: Record<string, unknown>): Loaded {
       lines: (r.lines as DocLine[]) ?? [],
       vat_mode: (r.vat_mode as VatMode) ?? 'std',
       notes: String(r.notes ?? ''),
+      ...(r.imported_totals ? { imported: r.imported_totals as ImportedTotals } : {}),
       business: {
         name: biz.name ?? '',
         address: biz.address ?? '',
@@ -98,8 +100,9 @@ export default function PublicDoc({ kind, token }: { kind: 'quote' | 'invoice'; 
               <QuoteReply token={token} doc={doc} onChanged={(next) => setDoc(next)} />
             ) : (
               <div className="no-print flex flex-col gap-3">
-                <button type="button" className="btn btn-brand" onClick={() => window.print()}>
-                  Print or save as PDF
+                <PdfButton doc={doc.data} className="btn btn-brand" />
+                <button type="button" className="btn" onClick={() => window.print()}>
+                  Print
                 </button>
                 <Contact doc={doc.data} />
               </div>
@@ -191,8 +194,9 @@ function QuoteReply({ token, doc, onChanged }: { token: string; doc: Loaded; onC
       {status === 'declined' && (
         <Notice tone="info">This quote was declined{doc.respondedAt ? ` on ${fmtDate(doc.respondedAt)}` : ''}. If that was a mistake, please contact {who}.</Notice>
       )}
+      <PdfButton doc={doc.data} />
       <button type="button" className="btn" onClick={() => window.print()}>
-        Print or save as PDF
+        Print
       </button>
       <Contact doc={doc.data} />
     </div>

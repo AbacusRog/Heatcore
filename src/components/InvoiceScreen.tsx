@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import type { Tone } from '../lib/calc';
-import { docLink, fmtDate, invoiceMail, lineUsed, mailText, mailtoUrl, readyToSend, todayIso } from '../lib/docs';
+import { docLink, fmtDate, invoiceDoc, invoiceMail, lineUsed, mailText, mailtoUrl, readyToSend, todayIso } from '../lib/docs';
 import type { Mail } from '../lib/docs';
-import type { Invoice, Settings } from '../lib/types';
+import type { Customer, Invoice, Settings } from '../lib/types';
 import { qboSendInvoice } from '../lib/qbo';
 import { errorText } from '../lib/useData';
 import DocShell from './DocShell';
+import PdfButton from './PdfButton';
 import { Notice, copyText } from './ui';
 
 export const invoicePill = (i: Invoice): { tone: Tone; label: string } => {
@@ -17,13 +18,14 @@ export const invoicePill = (i: Invoice): { tone: Tone; label: string } => {
 interface Props {
   invoice: Invoice;
   settings: Settings;
+  customers: Customer[];
   onUpdate: (patch: Partial<Invoice>) => Promise<Invoice>;
   onBack: () => void;
   onDelete: () => Promise<void>;
   onSettings: () => void;
 }
 
-export default function InvoiceScreen({ invoice, settings, onUpdate, onBack, onDelete, onSettings }: Props) {
+export default function InvoiceScreen({ invoice, settings, customers, onUpdate, onBack, onDelete, onSettings }: Props) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'good' | 'bad' | 'info'; text: string } | null>(null);
   const [mail, setMail] = useState<Mail | null>(null);
@@ -90,7 +92,12 @@ export default function InvoiceScreen({ invoice, settings, onUpdate, onBack, onD
         </Notice>
       )}
       {invoice.status === 'paid' && <Notice tone="good">Paid{invoice.paid_at ? ` on ${fmtDate(invoice.paid_at)}` : ''}.</Notice>}
-      {invoice.qbo_exported_at && (
+      {invoice.imported && (
+        <Notice tone="info">
+          Copied from QuickBooks as a record. The totals are QuickBooks’ own. To change this invoice, change it in QuickBooks.
+        </Notice>
+      )}
+      {invoice.qbo_exported_at && !invoice.imported && (
         <Notice tone="good">
           In QuickBooks{invoice.qbo_doc ? ` as invoice ${invoice.qbo_doc}` : ''} since {fmtDate(invoice.qbo_exported_at)}.
         </Notice>
@@ -104,6 +111,7 @@ export default function InvoiceScreen({ invoice, settings, onUpdate, onBack, onD
       kind="invoice"
       doc={invoice}
       settings={settings}
+      customers={customers}
       pill={pill}
       onSave={(patch) => onUpdate(patch as Partial<Invoice>)}
       onBack={onBack}
@@ -113,9 +121,11 @@ export default function InvoiceScreen({ invoice, settings, onUpdate, onBack, onD
         <>
           {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
 
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void emailIt(flush, current as Invoice)}>
-            {invoice.status === 'draft' ? 'Email to customer' : 'Email a copy to customer'}
-          </button>
+          {!invoice.imported && (
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void emailIt(flush, current as Invoice)}>
+              {invoice.status === 'draft' ? 'Email to customer' : 'Email a copy to customer'}
+            </button>
+          )}
 
           {mail && (
             <div className="card flex flex-col gap-2">
@@ -128,6 +138,7 @@ export default function InvoiceScreen({ invoice, settings, onUpdate, onBack, onD
             </div>
           )}
 
+          {!invoice.imported && (
           <div className="card flex flex-col gap-2">
             <p className="m-0 text-[0.9rem] font-semibold">QuickBooks</p>
             {invoice.qbo_exported_at ? (
@@ -141,8 +152,9 @@ export default function InvoiceScreen({ invoice, settings, onUpdate, onBack, onD
               QuickBooks connection
             </button>
           </div>
+          )}
 
-          {invoice.status === 'sent' && (
+          {invoice.status === 'sent' && !invoice.imported && (
             <button
               type="button"
               className="btn"
@@ -152,7 +164,7 @@ export default function InvoiceScreen({ invoice, settings, onUpdate, onBack, onD
               Mark as paid
             </button>
           )}
-          {invoice.status === 'paid' && (
+          {invoice.status === 'paid' && !invoice.imported && (
             <button
               type="button"
               className="btn"
@@ -163,6 +175,8 @@ export default function InvoiceScreen({ invoice, settings, onUpdate, onBack, onD
             </button>
           )}
 
+          <PdfButton doc={invoiceDoc(current as Invoice, settings)} />
+
           {invoice.status !== 'draft' && (
             <button type="button" className="btn" onClick={() => void copy(link, 'Link copied.')}>
               Copy customer link
@@ -170,10 +184,10 @@ export default function InvoiceScreen({ invoice, settings, onUpdate, onBack, onD
           )}
           {invoice.status !== 'draft' && (
             <button type="button" className="btn" onClick={() => window.print()}>
-              Print or save as PDF
+              Print
             </button>
           )}
-          {invoice.status !== 'draft' && (
+          {invoice.status !== 'draft' && !invoice.imported && (
             <button type="button" className="btn" disabled={busy} onClick={() => void run(async () => void (await onUpdate({ status: 'draft', paid_at: null })))}>
               Edit as a draft again
             </button>

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { defaultSettings, pad } from './docs';
 import { supabase } from './supabase';
-import type { Invoice, Quote, Settings } from './types';
+import type { Customer, Invoice, Quote, Settings } from './types';
 
-type Table = 'jmc_quotes' | 'jmc_invoices';
+type Table = 'jmc_quotes' | 'jmc_invoices' | 'jmc_customers';
 
 export function errorText(e: unknown): string {
   const m = e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String((e as { message: unknown }).message) : '';
@@ -21,12 +21,28 @@ export function useRows<T extends { id: string }>(table: Table) {
 
   const load = useCallback(async () => {
     if (!supabase) return;
-    const { data, error: err } = await supabase.from(table).select('*').order('updated_at', { ascending: false });
+    // The database returns at most 1000 rows a request, so read in pages.
+    const all: T[] = [];
+    let failure: unknown = null;
+    for (let from = 0; ; from += 1000) {
+      const { data, error: err } = await supabase
+        .from(table)
+        .select('*')
+        .order(table === 'jmc_customers' ? 'name_key' : 'updated_at', { ascending: table === 'jmc_customers' })
+        .order('id')
+        .range(from, from + 999);
+      if (err) {
+        failure = err;
+        break;
+      }
+      all.push(...(data as unknown as T[]));
+      if (!data || data.length < 1000) break;
+    }
     if (!alive.current) return;
-    if (err) setError(errorText(err));
+    if (failure) setError(errorText(failure));
     else {
       setError('');
-      setRows(data as unknown as T[]);
+      setRows(all);
     }
     setLoaded(true);
   }, [table]);
@@ -86,6 +102,7 @@ export function useRows<T extends { id: string }>(table: Table) {
 }
 
 export const useQuotes = () => useRows<Quote>('jmc_quotes');
+export const useCustomers = () => useRows<Customer>('jmc_customers');
 export const useInvoices = () => useRows<Invoice>('jmc_invoices');
 
 /** The business details and numbering. Always returns a usable value, even before the first save. */

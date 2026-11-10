@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Tone } from '../lib/calc';
-import { docTotals, invoiceDoc, quoteDoc } from '../lib/docs';
+import { invoiceDoc, quoteDoc, totalsOf } from '../lib/docs';
 import { money } from '../lib/format';
-import type { DocData, DocLine, Invoice, Quote, Settings, VatMode } from '../lib/types';
+import type { Customer, DocData, DocLine, Invoice, Quote, Settings, VatMode } from '../lib/types';
 import { errorText } from '../lib/useData';
 import DocView from './DocView';
 import LineEditor from './LineEditor';
@@ -59,6 +59,8 @@ interface Props {
   kind: 'quote' | 'invoice';
   doc: Quote | Invoice;
   settings: Settings;
+  /** Saved customers, offered as suggestions on the name field. */
+  customers?: Customer[];
   pill: { tone: Tone; label: string };
   onSave: (patch: Record<string, unknown>) => Promise<unknown>;
   onBack: () => void;
@@ -74,7 +76,7 @@ const Chevron = () => (
   </svg>
 );
 
-export default function DocShell({ kind, doc, settings, pill, onSave, onBack, onSettings, top, actions }: Props) {
+export default function DocShell({ kind, doc, settings, customers = [], pill, onSave, onBack, onSettings, top, actions }: Props) {
   const draft = doc.status === 'draft';
   const [tab, setTab] = useState<'edit' | 'preview'>('edit');
   const [form, setForm] = useState<FormState>(() => formFrom(kind, doc));
@@ -123,7 +125,7 @@ export default function DocShell({ kind, doc, settings, pill, onSave, onBack, on
 
   const current = (draft ? { ...doc, ...patchFrom(kind, form), issue_date: form.issue_date || doc.issue_date } : doc) as Quote | Invoice;
   const data: DocData = kind === 'quote' ? quoteDoc(current as Quote, settings) : invoiceDoc(current as Invoice, settings);
-  const totals = docTotals(current.lines, current.vat_mode);
+  const totals = totalsOf(data);
 
   const back = async () => {
     try {
@@ -189,11 +191,32 @@ export default function DocShell({ kind, doc, settings, pill, onSave, onBack, on
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-[560px] flex-col gap-4 px-4 pt-4" style={{ paddingBottom: 'calc(120px + env(safe-area-inset-bottom))' }}>
+      <main className="mx-auto flex max-w-[560px] flex-col gap-4 px-4 pt-4" style={{ paddingBottom: 'calc(var(--nav-h) + 120px + env(safe-area-inset-bottom))' }}>
         {showForm ? (
           <>
             <Section title="Customer">
-              <TextField id="cname" label="Name" value={form.customer_name} onChange={(v) => change({ customer_name: v })} autoComplete="off" />
+              <TextField
+                id="cname"
+                label="Name"
+                list="saved-customers"
+                value={form.customer_name}
+                onChange={(v) => {
+                  const hit = customers.find((c) => c.name.toLowerCase() === v.trim().toLowerCase());
+                  // Choosing a saved customer fills in what we know, without overwriting anything already typed.
+                  change({
+                    customer_name: v,
+                    ...(hit && !form.customer_email.trim() ? { customer_email: hit.email } : {}),
+                    ...(hit && !form.customer_address.trim() ? { customer_address: hit.address } : {}),
+                  });
+                }}
+                autoComplete="off"
+                hint={customers.length ? 'Start typing to pick a saved customer.' : undefined}
+              />
+              <datalist id="saved-customers">
+                {customers.slice(0, 500).map((c) => (
+                  <option key={c.id} value={c.name} />
+                ))}
+              </datalist>
               <TextField id="cemail" label="Email" type="email" inputMode="email" value={form.customer_email} onChange={(v) => change({ customer_email: v })} />
               <TextField id="caddr" label="Address" rows={3} value={form.customer_address} onChange={(v) => change({ customer_address: v })} />
             </Section>
@@ -250,8 +273,8 @@ export default function DocShell({ kind, doc, settings, pill, onSave, onBack, on
           type="button"
           onClick={() => goTab('preview')}
           aria-label={`Total ${money(totals.gross)}. Preview and send.`}
-          className="no-print fixed inset-x-0 bottom-0 z-20 border-t border-lineStrong bg-surface text-left text-fg"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          className="no-print fixed inset-x-0 z-10 border-t border-lineStrong bg-surface text-left text-fg"
+          style={{ bottom: 'calc(var(--nav-h) + env(safe-area-inset-bottom))' }}
         >
           <span className="mx-auto flex max-w-[560px] items-center justify-between gap-3 px-4 py-3">
             <span className="block">

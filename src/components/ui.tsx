@@ -156,11 +156,14 @@ export function TextField({
   autoComplete = 'off',
   rows,
   hint,
+  list,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
+  /** id of a <datalist> offering suggestions. */
+  list?: string;
   type?: 'text' | 'email' | 'tel' | 'date';
   placeholder?: string;
   inputMode?: 'text' | 'email' | 'tel' | 'numeric';
@@ -188,6 +191,7 @@ export function TextField({
         <input
           id={id}
           type={type}
+          list={list}
           className="input"
           placeholder={placeholder}
           inputMode={inputMode}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { resizeLogo } from '../lib/logo';
-import { newOauthState, qboAuthorize, qboDisconnect, qboStatus } from '../lib/qbo';
+import { newOauthState, qboAuthorize, qboDisconnect, qboImportAll, qboStatus } from '../lib/qbo';
 import type { QboStatus } from '../lib/qbo';
 import type { Settings, VatMode } from '../lib/types';
 import { errorText } from '../lib/useData';
@@ -15,11 +15,13 @@ interface Props {
   onSignOut: () => void;
   /** Result of coming back from QuickBooks, if we just did. */
   qboMessage: { tone: 'good' | 'bad'; text: string } | null;
+  /** Called after an import so the lists reload. */
+  onImported: () => void;
 }
 
 const digits = (v: string) => v.replace(/[^0-9]/g, '');
 
-export default function SettingsScreen({ settings, email, save, onSignOut, qboMessage }: Props) {
+export default function SettingsScreen({ settings, email, save, onSignOut, qboMessage, onImported }: Props) {
   const [form, setForm] = useState<Settings>(settings);
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [err, setErr] = useState('');
@@ -147,7 +149,7 @@ export default function SettingsScreen({ settings, email, save, onSignOut, qboMe
           <TextField id="siterms" label="Invoice footer" rows={3} placeholder="e.g. Thank you for your business." value={form.invoice_terms} onChange={(v) => change({ invoice_terms: v })} />
         </Section>
 
-        <QuickBooksCard message={qboMessage} />
+        <QuickBooksCard message={qboMessage} onImported={onImported} />
 
         <Section title="Need help?">
           <p className="m-0 text-[0.9rem] text-muted">
@@ -156,6 +158,15 @@ export default function SettingsScreen({ settings, email, save, onSignOut, qboMe
               {SUPPORT_EMAIL}
             </a>
             . If a QuickBooks message shows an “Intuit reference”, include it.
+          </p>
+          <p className="m-0 text-[0.9rem] text-muted">
+            <a className="underline" href="/privacy" target="_blank" rel="noreferrer">
+              Privacy policy
+            </a>
+            {' · '}
+            <a className="underline" href="/terms" target="_blank" rel="noreferrer">
+              Terms of use
+            </a>
           </p>
         </Section>
 
@@ -170,11 +181,32 @@ export default function SettingsScreen({ settings, email, save, onSignOut, qboMe
   );
 }
 
-function QuickBooksCard({ message }: { message: { tone: 'good' | 'bad'; text: string } | null }) {
+function QuickBooksCard({ message, onImported }: { message: { tone: 'good' | 'bad'; text: string } | null; onImported: () => void }) {
   const [status, setStatus] = useState<QboStatus | null>(null);
   const [problem, setProblem] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [imported, setImported] = useState('');
+
+  async function importAll() {
+    setBusy(true);
+    setProblem('');
+    setImported('');
+    try {
+      const r = await qboImportAll(setProgress);
+      setImported(
+        r.customers === 0 && r.invoices === 0
+          ? `Everything in QuickBooks (${r.seen} invoices) is already in the app.`
+          : `Added ${r.customers} new customer${r.customers === 1 ? '' : 's'} and ${r.invoices} invoice${r.invoices === 1 ? '' : 's'} from QuickBooks.`,
+      );
+      onImported();
+    } catch (e) {
+      setProblem(`${errorText(e)} Anything already copied is kept. You can press the button again to carry on.`);
+    }
+    setProgress('');
+    setBusy(false);
+  }
 
   useEffect(() => {
     let live = true;
@@ -229,6 +261,17 @@ function QuickBooksCard({ message }: { message: { tone: 'good' | 'bad'; text: st
             Connected{status.company_name ? ` to ${status.company_name}` : ''}
             {status.env === 'sandbox' ? ' (test company, nothing real is changed)' : ''}.
           </Notice>
+          <div className="card flex flex-col gap-2">
+            <p className="m-0 text-[0.9rem] font-semibold">Copy from QuickBooks</p>
+            <p className="hint m-0">
+              Brings in every customer (names, addresses, emails, phone) and every invoice to date. It only reads from QuickBooks, nothing there is changed, and you can run it again any time to catch up.
+            </p>
+            {progress && <p role="status" className="m-0 text-[0.9rem]">{progress}</p>}
+            {imported && <Notice tone="good">{imported}</Notice>}
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void importAll()}>
+              {busy ? 'Copying…' : 'Import customers and invoices'}
+            </button>
+          </div>
           {confirm ? (
             <div className="grid grid-cols-2 gap-2">
               <button type="button" className="btn" onClick={() => setConfirm(false)}>

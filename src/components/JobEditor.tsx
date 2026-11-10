@@ -120,7 +120,7 @@ export default function JobEditor({ job, status, onChange, onBack, onDuplicate, 
 
       <main
         className="mx-auto flex max-w-[560px] flex-col gap-4 px-4 pt-4"
-        style={{ paddingBottom: 'calc(112px + env(safe-area-inset-bottom))' }}
+        style={{ paddingBottom: 'calc(var(--nav-h) + 112px + env(safe-area-inset-bottom))' }}
       >
         {tab === 'inputs' ? (
           <div id="panel-inputs" role="tabpanel" aria-labelledby="tab-inputs" className="flex flex-col gap-4">
@@ -275,8 +275,8 @@ export default function JobEditor({ job, status, onChange, onBack, onDuplicate, 
           type="button"
           onClick={() => switchTab('results')}
           aria-label={`Profit ${money(c.profit)}, net cash ${money(c.netCash)}. Open the full breakdown.`}
-          className="fixed inset-x-0 bottom-0 z-20 border-t border-lineStrong bg-surface text-left text-fg"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          className="fixed inset-x-0 z-10 border-t border-lineStrong bg-surface text-left text-fg"
+          style={{ bottom: 'calc(var(--nav-h) + env(safe-area-inset-bottom))' }}
         >
           <span className="mx-auto grid max-w-[560px] grid-cols-[1fr_1fr_auto] items-center gap-3 px-4 py-2.5">
             <span className="block min-w-0">

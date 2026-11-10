@@ -1,14 +1,15 @@
-export type Tab = 'jobs' | 'quotes' | 'invoices' | 'settings';
+export type Tab = 'jobs' | 'quotes' | 'invoices' | 'customers' | 'settings';
 
 const paths: Record<Tab, string> = {
   jobs: 'M4 7h16v12H4zM9 7V5h6v2M4 12h16',
   quotes: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5',
   invoices: 'M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6',
+  customers: 'M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5M16 4.5a3.5 3.5 0 010 6.5M18 14.8c2 .6 3.5 2.3 3.5 5.2',
   settings:
     'M12 15a3 3 0 100-6 3 3 0 000 6zM19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 00-2-1.2L14.2 3h-4.4l-.4 2.7a7 7 0 00-2 1.2l-2.3-1-2 3.4 2 1.5A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1a7 7 0 002 1.2l.4 2.7h4.4l.4-2.7a7 7 0 002-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z',
 };
 
-const labels: Record<Tab, string> = { jobs: 'Jobs', quotes: 'Quotes', invoices: 'Invoices', settings: 'Settings' };
+const labels: Record<Tab, string> = { jobs: 'Jobs', quotes: 'Quotes', invoices: 'Invoices', customers: 'Customers', settings: 'Settings' };
 
 export default function BottomNav({
   active,

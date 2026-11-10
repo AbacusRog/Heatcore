@@ -41,6 +41,31 @@ export const qboExchange = (code: string, realmId: string) =>
   call<{ company_name: string | null }>('/api/qbo/exchange', { method: 'POST', body: { code, realmId } });
 export const qboSendInvoice = (invoiceId: string) =>
   call<{ id: string; doc: string; exported_at: string }>('/api/qbo/invoice', { method: 'POST', body: { invoiceId } });
+export interface ImportStep {
+  fetched: number;
+  added: number;
+  next: number | null;
+}
+export const qboImportPage = (stage: 'customers' | 'invoices', start: number) =>
+  call<ImportStep>('/api/qbo/import', { method: 'POST', body: { stage, start } });
+
+/** Copy every customer, then every invoice, out of QuickBooks. Safe to run again: anything already here is skipped. */
+export async function qboImportAll(onProgress: (text: string) => void): Promise<{ customers: number; invoices: number; seen: number }> {
+  const out = { customers: 0, invoices: 0, seen: 0 };
+  for (const stage of ['customers', 'invoices'] as const) {
+    let start: number | null = 1;
+    let seen = 0;
+    while (start !== null) {
+      onProgress(`Reading ${stage} from QuickBooks… ${seen} so far`);
+      const r: ImportStep = await qboImportPage(stage, start);
+      seen += r.fetched;
+      out[stage] += r.added;
+      if (stage === 'invoices') out.seen = seen;
+      start = r.next;
+    }
+  }
+  return out;
+}
 export const qboDisconnect = () => call<{ ok: true }>('/api/qbo/disconnect', { method: 'POST' });
 
 const STATE_KEY = 'jmc.qbo.state';

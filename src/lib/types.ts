@@ -114,6 +114,28 @@ export interface Invoice {
   qbo_id: string | null;
   qbo_doc: string | null;
   qbo_exported_at: string | null;
+  /** Copied in from QuickBooks. A record only: its totals are QuickBooks' own. */
+  imported: boolean;
+  imported_totals: ImportedTotals | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Totals as QuickBooks worked them out, kept for invoices imported from it. */
+export interface ImportedTotals {
+  net: number;
+  vat: number;
+  total: number;
+  balance: number;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  source: 'app' | 'quickbooks';
   created_at: string;
   updated_at: string;
 }
@@ -145,4 +167,6 @@ export interface DocData {
   vat_mode: VatMode;
   notes: string;
   business: Business;
+  /** Set for an invoice imported from QuickBooks: show these totals instead of working them out. */
+  imported?: ImportedTotals;
 }

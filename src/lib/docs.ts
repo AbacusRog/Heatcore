@@ -76,6 +76,12 @@ export function docTotals(lines: DocLine[], vatMode: VatMode): Totals {
   return { net, vat, gross: r2(net + vat), rcVat };
 }
 
+/** The totals to show for a document: QuickBooks' own figures for an imported invoice, otherwise worked out from the lines. */
+export function totalsOf(d: DocData): Totals {
+  if (d.imported) return { net: d.imported.net, vat: d.imported.vat, gross: d.imported.total, rcVat: 0 };
+  return docTotals(d.lines, d.vat_mode);
+}
+
 /** Net amount of each kind of line, for the breakdown on the document. Untyped lines are left out. */
 export function kindTotals(lines: DocLine[]): Record<LineKind, number> {
   const out: Record<LineKind, number> = { normal: 0, cis_labour: 0, cis_materials: 0 };
@@ -176,7 +182,12 @@ export const invoiceDoc = (i: Invoice, s: Settings): DocData => ({
   vat_mode: i.vat_mode,
   notes: i.notes,
   business: businessOf(s, 'invoice'),
+  ...(i.imported && i.imported_totals ? { imported: i.imported_totals } : {}),
 });
+
+/** What the customer pays: QuickBooks' figure for an imported invoice, otherwise worked out from the lines. */
+export const grossOf = (d: Quote | Invoice): number =>
+  'imported_totals' in d && d.imported && d.imported_totals ? d.imported_totals.total : docTotals(d.lines, d.vat_mode).gross;
 
 /** Private link the customer opens. The long random token is the only key. */
 export const docLink = (kind: 'quote' | 'invoice', token: string, origin = window.location.origin): string =>
