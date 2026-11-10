@@ -98,7 +98,7 @@ export default function PublicDoc({ kind, token }: { kind: 'quote' | 'invoice'; 
               <QuoteReply token={token} doc={doc} onChanged={(next) => setDoc(next)} />
             ) : (
               <div className="no-print flex flex-col gap-3">
-                <button type="button" className="btn btn-primary" onClick={() => window.print()}>
+                <button type="button" className="btn btn-brand" onClick={() => window.print()}>
                   Print or save as PDF
                 </button>
                 <Contact doc={doc.data} />
@@ -173,7 +173,7 @@ function QuoteReply({ token, doc, onChanged }: { token: string; doc: Loaded; onC
             <button type="button" className="btn" disabled={busy} onClick={() => void answer(false)}>
               Decline
             </button>
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void answer(true)}>
+            <button type="button" className="btn btn-brand" disabled={busy} onClick={() => void answer(true)}>
               Accept quote
             </button>
           </div>

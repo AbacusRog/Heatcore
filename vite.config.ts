@@ -7,8 +7,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'apple-touch-icon.png'],
-      workbox: { navigateFallbackDenylist: [/^\/api\//] },
+      includeAssets: ['icon.svg', 'apple-touch-icon.png', 'heatcore-logo.jpg'],
+      workbox: { navigateFallbackDenylist: [/^\/api\//, /^\/(privacy|terms)/] },
       manifest: {
         name: 'Job Margin Checker',
         short_name: 'Job Margin',

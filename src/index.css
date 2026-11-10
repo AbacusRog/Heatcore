@@ -105,6 +105,9 @@ body {
   .btn-primary {
     @apply border-accent bg-accent text-accentInk;
   }
+  .btn-brand {
+    @apply border-heat-navy bg-heat-navy text-white;
+  }
   .btn-danger {
     @apply border-neg text-neg;
   }
@@ -141,6 +144,13 @@ input::placeholder {
 /* Quotes and invoices print on plain white paper whatever the phone's theme. */
 .paper {
   color-scheme: light;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* The colour strip across the top and the rule above the footer, from the Heatcore logo. */
+.heat-strip {
+  background: linear-gradient(90deg, #f26a0a 0%, #d93a0c 34%, #0a5fb4 68%, #0d2740 100%);
 }
 
 @media print {

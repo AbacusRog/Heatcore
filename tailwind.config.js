@@ -24,6 +24,15 @@ export default {
         cExtra: 'var(--c-extra)',
         cLab: 'var(--c-lab)',
         cProfit: 'var(--c-profit)',
+        // Heatcore Solutions logo colours, used on quotes and invoices.
+        heat: {
+          navy: '#0D2740',
+          blue: '#0A5FB4',
+          orange: '#F26A0A',
+          red: '#D93A0C',
+          ink: '#B83A06',
+          tint: '#EEF4FB',
+        },
       },
       fontFamily: {
         sans: ['"Hanken Grotesk"', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'sans-serif'],
